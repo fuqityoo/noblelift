@@ -498,8 +498,11 @@ def archive_download_and_clear(
     db.execute(delete(TaskModel).where(TaskModel.status_code == "done"))
     db.commit()
     output.seek(0)
+    csv_content = output.getvalue()
+    # UTF-8 with BOM для корректного отображения кириллицы в Excel и браузере
+    body = csv_content.encode("utf-8-sig")
     return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
+        iter([body]),
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=archive_tasks.csv"},
     )
