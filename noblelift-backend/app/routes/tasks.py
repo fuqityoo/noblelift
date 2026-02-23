@@ -455,6 +455,17 @@ def delete_task(
     return
 
 
+# Перевод кодов и флагов в русский для CSV-архива
+_PRIORITY_RU = {"low": "низкий", "medium": "средний", "high": "высокий", "urgent": "срочный"}
+_STATUS_RU = {"new": "Новая", "in_progress": "В работе", "pause": "Пауза", "done": "Завершена"}
+_TYPE_RU = {"regular": "Личная", "common": "Общая"}
+
+
+def _fmt_dt(dt: Optional[datetime]) -> str:
+    if not dt: return ""
+    return dt.strftime("%d.%m.%Y %H:%M") if hasattr(dt, "strftime") else str(dt)
+
+
 @router.post("/archive/download-and-clear")
 def archive_download_and_clear(
     request: Request,
@@ -469,31 +480,36 @@ def archive_download_and_clear(
         .options(
             joinedload(TaskModel.assignee),
             joinedload(TaskModel.creator),
+            joinedload(TaskModel.topic),
         )
         .where(TaskModel.status_code == "done")
         .order_by(TaskModel.id)
     ).scalars().all()
     output = io.StringIO()
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
     writer.writerow([
-        "id", "title", "content", "due_date", "priority_code", "status_code",
-        "is_private", "type", "creator_id", "assignee_id", "assignee_name", "creator_name", "created_at"
+        "ID", "Название", "Тема", "Описание", "Срок", "Приоритет", "Статус",
+        "Личная", "Тип задачи", "ID создателя", "ID исполнителя", "Исполнитель", "Создатель", "Создано"
     ])
     for t in rows:
+        pc = (t.priority_code or "").strip().lower()
+        sc = (t.status_code or "").strip().lower()
+        tc = (t.type or "").strip().lower()
         writer.writerow([
             t.id,
-            t.title or "",
-            (t.content or "")[:500],
-            t.due_date.isoformat() if t.due_date else "",
-            t.priority_code or "",
-            t.status_code or "",
-            t.is_private,
-            t.type or "",
+            (t.title or "").replace("\n", " ").replace("\r", ""),
+            (t.topic.name if t.topic else "").replace("\n", " ").replace("\r", ""),
+            ((t.content or "")[:500]).replace("\n", " ").replace("\r", ""),
+            _fmt_dt(t.due_date),
+            _PRIORITY_RU.get(pc, pc or "средний"),
+            _STATUS_RU.get(sc, sc or "Новая"),
+            "Да" if t.is_private else "Нет",
+            _TYPE_RU.get(tc, tc or "Личная"),
             t.creator_id,
             t.assignee_id or "",
-            t.assignee.full_name if t.assignee else "",
-            t.creator.full_name if t.creator else "",
-            t.created_at.isoformat() if t.created_at else "",
+            (t.assignee.full_name if t.assignee else "").replace("\n", " ").replace("\r", ""),
+            (t.creator.full_name if t.creator else "").replace("\n", " ").replace("\r", ""),
+            _fmt_dt(t.created_at),
         ])
     db.execute(delete(TaskModel).where(TaskModel.status_code == "done"))
     db.commit()
