@@ -1,0 +1,26 @@
+# Backend
+noblelift-backend/venv/
+noblelift-backend/.env
+noblelift-backend/var/
+noblelift-backend/uploads/
+noblelift-backend/*.pyc
+noblelift-backend/__pycache__/
+noblelift-backend/app/__pycache__/
+noblelift-backend/**/__pycache__/
+
+# Frontend
+noblelift-app-main/node_modules/
+noblelift-app-main/.env
+noblelift-app-main/.expo/
+noblelift-app-main/dist/
+noblelift-app-main/npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

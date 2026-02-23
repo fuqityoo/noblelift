@@ -1,0 +1,66 @@
+noblelift-backend/
+├─ app/
+│  ├─ routes/
+│  │  ├─ __init__.py
+│  │  ├─ deps.py
+│  │  ├─ health.py
+│  │  ├─ auth.py
+│  │  ├─ users.py
+│  │  ├─ profiles.py
+│  │  ├─ tasks.py
+│  │  ├─ task_files.py
+│  │  ├─ task_events.py
+│  │  ├─ directories.py
+│  │  ├─ documents.py
+│  │  ├─ permissions.py
+│  │  ├─ vehicles.py
+│  │  └─ notifications.py
+│  ├─ core/
+│  │  ├─ __init__.py
+│  │  ├─ config.py
+│  │  ├─ security.py
+│  │  └─ pagination.py
+│  ├─ db/
+│  │  ├─ __init__.py
+│  │  ├─ base.py
+│  │  ├─ session.py
+│  │  └─ seed.py
+│  ├─ models/
+│  │  ├─ __init__.py
+│  │  ├─ user.py
+│  │  ├─ role.py
+│  │  ├─ profile.py
+│  │  ├─ status.py
+│  │  ├─ task.py
+│  │  ├─ task_file.py
+│  │  ├─ task_event.py
+│  │  ├─ directory.py
+│  │  ├─ document.py
+│  │  ├─ permission.py
+│  │  ├─ vehicle.py
+│  │  ├─ vehicle_log.py
+│  │  ├─ notification.py
+│  │  └─ team.py
+│  ├─ schemas/
+│  │  ├─ __init__.py
+│  │  ├─ auth.py
+│  │  ├─ user.py
+│  │  ├─ profile.py
+│  │  ├─ team.py
+│  │  ├─ task.py
+│  │  ├─ task_file.py
+│  │  ├─ task_event.py
+│  │  ├─ directory.py
+│  │  ├─ document.py
+│  │  ├─ permission.py
+│  │  ├─ vehicle.py
+│  │  └─ notification.py
+│  └─ main.py
+├─ alembic/
+├─ alembic.ini
+├─ .env.example
+├─ requirements.txt
+├─ README.md
+└─ scripts/
+   ├─ run_dev.sh
+   └─ init_db.sh

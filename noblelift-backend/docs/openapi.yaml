@@ -1,0 +1,1937 @@
+openapi: 3.0.3
+info:
+  title: Noblelift App API
+  version: 1.0.0
+  description: |
+    REST API для корпоративной системы Noblelift.
+    Согласовано с ТЗ и текущим фронтендом. Таймстемпы — Unix ms (int64), camelCase в JSON.
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production
+  - url: http://localhost:8000/api/v1
+    description: Local
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Roles
+  - name: Profiles
+  - name: Statuses
+  - name: Teams
+  - name: TaskTopics
+  - name: Tasks
+  - name: TaskFiles
+  - name: TaskEvents
+  - name: Notifications
+  - name: Push
+  - name: Directories
+  - name: Documents
+  - name: Permissions
+  - name: Vehicles
+  - name: Audit
+  - name: Admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness/Readiness probe
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /version:
+    get:
+      tags: [Health]
+      summary: Версия приложения
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Version' }
+
+  # ---------- Auth ----------
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Логин по email/паролю
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Обновление токенов по refresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход (аннулировать refresh)
+      responses:
+        '204': { description: No Content }
+
+  /auth/password/change:
+    post:
+      tags: [Auth]
+      summary: Смена пароля текущим пользователем
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /auth/password/reset/request:
+    post:
+      tags: [Auth]
+      summary: Запрос на сброс пароля (email)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetRequest' }
+      responses:
+        '204': { description: No Content }
+
+  /auth/password/reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Подтверждение сброса пароля (token)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetConfirm' }
+      responses:
+        '204': { description: No Content }
+
+  # ---------- Users & Roles ----------
+  /users:
+    get:
+      tags: [Users]
+      summary: Список пользователей
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - in: query
+          name: role
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, description: 'Текущий статус профиля (code)' }
+        - in: query
+          name: q
+          schema: { type: string, description: 'Поиск по имени/почте' }
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedUsers' }
+    post:
+      tags: [Users]
+      summary: Создать пользователя (super_admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Карточка пользователя
+      parameters: [ { $ref: '#/components/parameters/UserId' } ]
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+    patch:
+      tags: [Users]
+      summary: Обновить пользователя
+      parameters: [ { $ref: '#/components/parameters/UserId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+    delete:
+      tags: [Users]
+      summary: Деактивировать/удалить пользователя
+      parameters: [ { $ref: '#/components/parameters/UserId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /roles:
+    get:
+      tags: [Roles]
+      summary: Список ролей
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoleList' }
+
+  # ---------- Profiles & Statuses ----------
+  /profiles/me:
+    get:
+      tags: [Profiles]
+      summary: Мой профиль
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+    patch:
+      tags: [Profiles]
+      summary: Обновить мой профиль
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+  /profiles/me/status:
+    post:
+      tags: [Profiles, Statuses]
+      summary: Сменить мой статус
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileStatusChange' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+  /profiles/{userId}:
+    patch:
+      tags: [Profiles]
+      summary: Обновить профиль другого пользователя (manager/super_admin)
+      parameters: [ { $ref: '#/components/parameters/UserIdParam' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileAdminUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+  /statuses:
+    get:
+      tags: [Statuses]
+      summary: Справочник статусов профиля
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusList' }
+
+  # ---------- Teams ----------
+  /teams:
+    get:
+      tags: [Teams]
+      summary: Список команд
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedTeams' }
+    post:
+      tags: [Teams]
+      summary: Создать команду (manager/super_admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      summary: Детали команды
+      parameters: [ { $ref: '#/components/parameters/TeamId' } ]
+      responses:
+        '200':
+          description: Team
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamDetails' }
+    patch:
+      tags: [Teams]
+      summary: Обновить команду
+      parameters: [ { $ref: '#/components/parameters/TeamId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+    delete:
+      tags: [Teams]
+      summary: Удалить команду
+      parameters: [ { $ref: '#/components/parameters/TeamId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      summary: Добавить участника
+      parameters: [ { $ref: '#/components/parameters/TeamId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamMemberAdd' }
+      responses:
+        '204': { description: No Content }
+
+  /teams/{id}/members/{userId}:
+    delete:
+      tags: [Teams]
+      summary: Удалить участника
+      parameters:
+        - { $ref: '#/components/parameters/TeamId' }
+        - { $ref: '#/components/parameters/UserIdParam' }
+      responses:
+        '204': { description: No Content }
+
+  # ---------- Task Topics ----------
+  /task-topics:
+    get:
+      tags: [TaskTopics]
+      summary: Список тем задач
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskTopicList' }
+    post:
+      tags: [TaskTopics]
+      summary: Создать тему (super_admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskTopicCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskTopic' }
+
+  /task-topics/{id}:
+    patch:
+      tags: [TaskTopics]
+      summary: Обновить тему
+      parameters: [ { $ref: '#/components/parameters/TaskTopicId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskTopicUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskTopic' }
+    delete:
+      tags: [TaskTopics]
+      summary: Удалить/деактивировать тему
+      parameters: [ { $ref: '#/components/parameters/TaskTopicId' } ]
+      responses:
+        '204': { description: No Content }
+
+  # ---------- Tasks ----------
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Список задач
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - in: query
+          name: status
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/TaskStatusCode' }
+          style: form
+          explode: false
+        - in: query
+          name: priority
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/PriorityCode' }
+          style: form
+          explode: false
+        - in: query
+          name: assigneeId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: creatorId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: topicId
+          schema: { type: integer }
+        - in: query
+          name: isPrivate
+          schema: { type: boolean }
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/TaskType' }
+        - in: query
+          name: archived
+          schema: { type: boolean }
+        - in: query
+          name: dueFrom
+          schema: { type: integer, format: int64, description: 'Unix ms' }
+        - in: query
+          name: dueTo
+          schema: { type: integer, format: int64, description: 'Unix ms' }
+        - in: query
+          name: q
+          schema: { type: string, description: 'Поиск по title/content' }
+        - in: query
+          name: sort
+          schema: { type: string, example: 'dueDate,-priority' }
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedTasks' }
+    post:
+      tags: [Tasks]
+      summary: Создать задачу
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/available:
+    get:
+      tags: [Tasks]
+      summary: Общие задачи (не взятые)
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedTasks' }
+
+  /tasks/archive:
+    get:
+      tags: [Tasks]
+      summary: Архивные задачи
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedTasks' }
+    delete:
+      tags: [Tasks, Admin]
+      summary: Очистить архив после выгрузки
+      responses:
+        '204': { description: No Content }
+
+  /tasks/archive/export:
+    post:
+      tags: [ Tasks, Admin ]
+      summary: Выгрузка архива в CSV
+      responses:
+        '200':
+          description: Export result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArchiveExportResult' }
+
+  /tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Карточка задачи
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+    patch:
+      tags: [Tasks]
+      summary: Обновить свойства задачи
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+    delete:
+      tags: [Tasks]
+      summary: Удалить/архивировать задачу (по политике)
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /tasks/{id}/assign:
+    post:
+      tags: [Tasks]
+      summary: Назначить исполнителя
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskAssign' }
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/unassign:
+    post:
+      tags: [Tasks]
+      summary: Снять исполнителя
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/take:
+    post:
+      tags: [Tasks]
+      summary: Взять общую задачу себе
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/release:
+    post:
+      tags: [Tasks]
+      summary: Вернуть задачу в общие
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/status:
+    post:
+      tags: [Tasks]
+      summary: Сменить статус задачи
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskStatusChange' }
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/archive:
+    post:
+      tags: [Tasks]
+      summary: Архивировать задачу (только если done)
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/unarchive:
+    post:
+      tags: [Tasks]
+      summary: Вернуть из архива
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+
+  /tasks/{id}/files:
+    get:
+      tags: [TaskFiles]
+      summary: Список файлов задачи
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TaskFile' }
+    post:
+      tags: [TaskFiles]
+      summary: Добавить файл к задаче
+      parameters: [ { $ref: '#/components/parameters/TaskId' } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/TaskFileUploadMultipart' }
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskFileUploadViaUri' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskFile' }
+
+  /tasks/{id}/files/{fileId}:
+    delete:
+      tags: [TaskFiles]
+      summary: Удалить файл из задачи
+      parameters:
+        - { $ref: '#/components/parameters/TaskId' }
+        - { $ref: '#/components/parameters/TaskFileId' }
+      responses:
+        '204': { description: No Content }
+
+  /tasks/{id}/events:
+    get:
+      tags: [TaskEvents]
+      summary: История событий задачи
+      parameters:
+        - { $ref: '#/components/parameters/TaskId' }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedTaskEvents' }
+
+  # ---------- Notifications & Push ----------
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Мои уведомления
+      parameters:
+        - in: query
+          name: isRead
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedNotifications' }
+
+  /notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Отметить уведомление прочитанным
+      parameters: [ { $ref: '#/components/parameters/NotificationId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Отметить все уведомления прочитанными
+      responses:
+        '204': { description: No Content }
+
+  /push/subscribe:
+    post:
+      tags: [Push]
+      summary: Сохранить WebPush подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushSubscriptionCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PushSubscription' }
+
+  /push/subscriptions/{id}:
+    delete:
+      tags: [Push]
+      summary: Удалить подписку
+      parameters: [ { $ref: '#/components/parameters/PushSubscriptionId' } ]
+      responses:
+        '204': { description: No Content }
+
+  # ---------- Directory & Documents ----------
+  /directories:
+    get:
+      tags: [Directories]
+      summary: Список разделов (дерево или плоско)
+      parameters:
+        - in: query
+          name: flat
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Directory' }
+    post:
+      tags: [Directories]
+      summary: Создать раздел
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectoryCreateDnD' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Directory' }
+
+  /directories/{id}:
+    get:
+      tags: [Directories]
+      summary: Детали раздела (дети и документы)
+      parameters: [ { $ref: '#/components/parameters/DirectoryId' } ]
+      responses:
+        '200':
+          description: Directory details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DirectoryDetails' }
+    patch:
+      tags: [Directories]
+      summary: Обновить раздел
+      parameters: [ { $ref: '#/components/parameters/DirectoryId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectoryUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Directory' }
+    delete:
+      tags: [Directories]
+      summary: Удалить раздел
+      parameters: [ { $ref: '#/components/parameters/DirectoryId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /documents:
+    get:
+      tags: [Documents]
+      summary: Поиск документов
+      parameters:
+        - in: query
+          name: directoryId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: q
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedDocuments' }
+    post:
+      tags: [Documents]
+      summary: Создать документ (версия 1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DocumentCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+
+  /documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Карточка документа
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      responses:
+        '200':
+          description: Document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+    patch:
+      tags: [Documents]
+      summary: Обновить документ (переименовать/переместить)
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DocumentUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+    delete:
+      tags: [Documents]
+      summary: Удалить документ
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /documents/{id}/versions:
+    get:
+      tags: [Documents]
+      summary: Список версий документа
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DocumentVersion' }
+    post:
+      tags: [Documents]
+      summary: Загрузить новую версию
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DocumentVersionCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentVersion' }
+
+  /documents/{id}/download:
+    get:
+      tags: [Documents]
+      summary: Получить ссылку для скачивания
+      parameters: [ { $ref: '#/components/parameters/DocumentId' } ]
+      responses:
+        '200':
+          description: URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadLink' }
+
+  # ---------- Permissions ----------
+  /permissions:
+    get:
+      tags: [Permissions]
+      summary: Список ACL-правил
+      parameters:
+        - in: query
+          name: subjectType
+          schema: { $ref: '#/components/schemas/SubjectType' }
+        - in: query
+          name: subjectId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: resourceType
+          schema: { $ref: '#/components/schemas/ResourceType' }
+        - in: query
+          name: resourceId
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Permission' }
+    post:
+      tags: [Permissions]
+      summary: Создать правило
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PermissionCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Permission' }
+
+  /permissions/{id}:
+    delete:
+      tags: [Permissions]
+      summary: Удалить правило
+      parameters: [ { $ref: '#/components/parameters/PermissionId' } ]
+      responses:
+        '204': { description: No Content }
+
+  # ---------- Vehicles ----------
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: Список авто
+      parameters:
+        - in: query
+          name: isActive
+          schema: { type: boolean }
+        - in: query
+          name: q
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedVehicles' }
+    post:
+      tags: [Vehicles]
+      summary: Добавить авто (super_admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VehicleCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vehicle' }
+
+  /vehicles/{id}:
+    get:
+      tags: [Vehicles]
+      summary: Карточка авто (с текущим держателем)
+      parameters: [ { $ref: '#/components/parameters/VehicleId' } ]
+      responses:
+        '200':
+          description: Vehicle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleDetails' }
+    patch:
+      tags: [Vehicles]
+      summary: Обновить авто
+      parameters: [ { $ref: '#/components/parameters/VehicleId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VehicleUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vehicle' }
+    delete:
+      tags: [Vehicles]
+      summary: Исключить из парка
+      parameters: [ { $ref: '#/components/parameters/VehicleId' } ]
+      responses:
+        '204': { description: No Content }
+
+  /vehicles/{id}/logs:
+    get:
+      tags: [Vehicles]
+      summary: Журнал действий по авто
+      parameters:
+        - { $ref: '#/components/parameters/VehicleId' }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedVehicleLogs' }
+
+  /vehicles/{id}/take:
+    post:
+      tags: [Vehicles]
+      summary: Взять авто
+      parameters: [ { $ref: '#/components/parameters/VehicleId' } ]
+      responses:
+        '201':
+          description: Created (log)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleLog' }
+
+  /vehicles/{id}/release:
+    post:
+      tags: [Vehicles]
+      summary: Оставить авто
+      parameters: [ { $ref: '#/components/parameters/VehicleId' } ]
+      responses:
+        '201':
+          description: Created (log)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleLog' }
+
+  # ---------- Audit ----------
+  /audit:
+    get:
+      tags: [Audit]
+      summary: Список записей аудита
+      parameters:
+        - in: query
+          name: entity
+          schema: { type: string }
+        - in: query
+          name: entityId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: actorId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: dateFrom
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: dateTo
+          schema: { type: integer, format: int64 }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedAuditLog' }
+
+  /audit/{id}:
+    get:
+      tags: [Audit]
+      summary: Деталь записи аудита
+      parameters: [ { $ref: '#/components/parameters/AuditId' } ]
+      responses:
+        '200':
+          description: Audit record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditRecord' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Limit:
+      in: query
+      name: limit
+      schema: { type: integer, default: 20, minimum: 1, maximum: 200 }
+    Offset:
+      in: query
+      name: offset
+      schema: { type: integer, default: 0, minimum: 0 }
+    UserId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    UserIdParam:
+      in: path
+      name: userId
+      required: true
+      schema: { type: integer, format: int64 }
+    TeamId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    TaskId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    TaskFileId:
+      in: path
+      name: fileId
+      required: true
+      schema: { type: integer, format: int64 }
+    TaskTopicId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    NotificationId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    PushSubscriptionId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    DirectoryId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    DocumentId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    PermissionId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    VehicleId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+    AuditId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    # ----- Meta -----
+    Health:
+      type: object
+      properties:
+        status: { type: string, example: 'ok' }
+        uptimeSec: { type: number }
+    Version:
+      type: object
+      properties:
+        app: { type: string, example: 'noblelift-backend' }
+        version: { type: string, example: '1.0.0' }
+        commit: { type: string, example: 'abc1234' }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+
+    # ----- Auth -----
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        rememberMe: { type: boolean, default: false }
+    RefreshRequest:
+      type: object
+      required: [refresh]
+      properties:
+        refresh: { type: string }
+    AuthTokens:
+      type: object
+      properties:
+        access: { type: string }
+        refresh: { type: string }
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string }
+
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    PasswordResetConfirm:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token: { type: string }
+        newPassword: { type: string }
+
+    # ----- Users -----
+    RoleCode:
+      type: string
+      enum: [super_admin, manager, employee]
+    Role:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { $ref: '#/components/schemas/RoleCode' }
+        name: { type: string }
+    RoleList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        fullName: { type: string }
+        title: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        role:
+          $ref: '#/components/schemas/Role'
+        isActive: { type: boolean }
+        createdAt: { type: integer, format: int64, description: 'Unix ms' }
+        profile:
+          $ref: '#/components/schemas/Profile'
+
+    UserCreate:
+      type: object
+      required: [email, password, fullName, roleId]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        fullName: { type: string }
+        roleId: { type: integer }
+        phone: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+
+    UserUpdate:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        fullName: { type: string }
+        roleId: { type: integer }
+        phone: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    PaginatedUsers:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    # ----- Profiles/Statuses -----
+    ProfileStatusCode:
+      type: string
+      enum: [in_office, remote, away, meeting, dayoff, business_trip, vacation]
+    ProfileStatus:
+      type: object
+      properties:
+        code: { $ref: '#/components/schemas/ProfileStatusCode' }
+        label: { type: string, example: 'В офисе' }
+
+    ProfileLinks:
+      type: object
+      nullable: true
+      properties:
+        telegram: { type: string, nullable: true }
+        whatsapp: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+
+    ProfileStatusPayload:
+      type: object
+      nullable: true
+      description: 'Напр., для отпуск/командировка: {from:number ms, to:number ms}'
+      properties:
+        from: { type: integer, format: int64, nullable: true }
+        to: { type: integer, format: int64, nullable: true }
+      additionalProperties: true
+
+    Profile:
+      type: object
+      properties:
+        userId: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/ProfileStatus' }
+        statusPayload: { $ref: '#/components/schemas/ProfileStatusPayload' }
+        links: { $ref: '#/components/schemas/ProfileLinks' }
+        arrivedAt: { type: integer, format: int64, nullable: true }
+        lastSeenAt: { type: integer, format: int64, nullable: true }
+
+    ProfileUpdate:
+      type: object
+      properties:
+        links: { $ref: '#/components/schemas/ProfileLinks' }
+        avatarUrl: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+
+    ProfileAdminUpdate:
+      allOf:
+        - $ref: '#/components/schemas/ProfileUpdate'
+        - type: object
+          properties:
+            status: { $ref: '#/components/schemas/ProfileStatus' }
+            statusPayload: { $ref: '#/components/schemas/ProfileStatusPayload' }
+
+    ProfileStatusChange:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/ProfileStatus' }
+        statusPayload: { $ref: '#/components/schemas/ProfileStatusPayload' }
+
+    StatusList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProfileStatus' }
+
+    # ----- Teams -----
+    Team:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        createdAt: { type: integer, format: int64 }
+    TeamCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+    TeamUpdate:
+      type: object
+      properties:
+        name: { type: string }
+    TeamDetails:
+      type: object
+      properties:
+        team: { $ref: '#/components/schemas/Team' }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+    TeamMemberAdd:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: integer, format: int64 }
+    PaginatedTeams:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Team' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    # ----- Task Topics -----
+    TaskTopic:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        isActive: { type: boolean }
+    TaskTopicCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+    TaskTopicUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        isActive: { type: boolean }
+    TaskTopicList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TaskTopic' }
+
+    # ----- Tasks -----
+    TaskType:
+      type: string
+      enum: [regular, common]
+    PriorityCode:
+      type: string
+      enum: [low, medium, high, urgent]
+    Priority:
+      type: object
+      properties:
+        code: { $ref: '#/components/schemas/PriorityCode' }
+        label: { type: string, example: 'Средний' }
+    TaskStatusCode:
+      type: string
+      enum: [new, in_progress, pause, done, cancelled]
+    TaskStatus:
+      type: object
+      properties:
+        code: { $ref: '#/components/schemas/TaskStatusCode' }
+        label: { type: string, example: 'В работе' }
+
+    Task:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        creatorId: { type: integer, format: int64 }
+        assigneeId: { type: integer, format: int64, nullable: true }
+        title: { type: string }
+        content: { type: string, nullable: true }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+        dueDate: { type: integer, format: int64, nullable: true }
+        priority: { $ref: '#/components/schemas/Priority' }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        topicId: { type: integer, nullable: true }
+        topicText: { type: string, nullable: true }
+        isPrivate: { type: boolean }
+        type: { $ref: '#/components/schemas/TaskType' }
+        archived: { type: boolean }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/TaskFile' }
+
+    TaskCreate:
+      type: object
+      required: [ title ]
+      properties:
+        title: { type: string }
+        content: { type: string, nullable: true }
+        dueDate: { type: integer, format: int64, nullable: true }
+        priorityCode: { $ref: '#/components/schemas/PriorityCode' }
+        statusCode: { $ref: '#/components/schemas/TaskStatusCode' }
+        isPrivate: { type: boolean }
+        type: { $ref: '#/components/schemas/TaskType' }
+        topicId: { type: integer, nullable: true }
+        topicText: { type: string, nullable: true }
+        assigneeId: { type: integer, format: int64, nullable: true }
+
+    TaskUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        content: { type: string, nullable: true }
+        dueDate: { type: integer, format: int64, nullable: true }
+        priorityCode: { $ref: '#/components/schemas/PriorityCode' }
+        topicId: { type: integer, nullable: true }
+        topicText: { type: string, nullable: true }
+        isPrivate: { type: boolean }
+        type: { $ref: '#/components/schemas/TaskType' }
+
+    TaskAssign:
+      type: object
+      required: [assigneeId]
+      properties:
+        assigneeId: { type: integer, format: int64 }
+
+    TaskStatusChange:
+      type: object
+      required: [statusCode]
+      properties:
+        statusCode: { $ref: '#/components/schemas/TaskStatusCode' }
+
+    PaginatedTasks:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    # ----- Task Files / Events -----
+    TaskFile:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        taskId: { type: integer, format: int64 }
+        fileKey: { type: string }
+        fileName: { type: string }
+        size: { type: integer, nullable: true }
+        mime: { type: string, nullable: true }
+        uploadedBy: { type: integer, format: int64, nullable: true }
+        createdAt: { type: integer, format: int64 }
+
+    TaskFileUploadMultipart:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        fileName:
+          type: string
+
+    TaskFileUploadViaUri:
+      type: object
+      required: [fileName, uri]
+      properties:
+        fileName: { type: string }
+        uri: { type: string, description: 'Ссылка в облаке/репозитории' }
+
+    TaskEvent:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        taskId: { type: integer, format: int64 }
+        type: { type: string }
+        payload: { type: object, additionalProperties: true, nullable: true }
+        createdAt: { type: integer, format: int64 }
+        actorId: { type: integer, format: int64, nullable: true }
+
+    PaginatedTaskEvents:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TaskEvent' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    ArchiveExportResult:
+      type: object
+      properties:
+        fileUrl: { type: string, nullable: true }
+        exportedAt: { type: integer, format: int64 }
+
+    # ----- Notifications / Push -----
+    Notification:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string, nullable: true }
+        payload: { type: object, additionalProperties: true, nullable: true }
+        isRead: { type: boolean }
+        createdAt: { type: integer, format: int64 }
+
+    PaginatedNotifications:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    PushSubscription:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        endpoint: { type: string }
+        keys:
+          type: object
+          properties:
+            p256dh: { type: string }
+            auth: { type: string }
+        ua: { type: string, nullable: true }
+        createdAt: { type: integer, format: int64 }
+
+    PushSubscriptionCreate:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        endpoint: { type: string }
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string }
+            auth: { type: string }
+        ua: { type: string, nullable: true }
+
+    # ----- Directories / Documents / ACL -----
+    Directory:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        parentId: { type: integer, format: int64, nullable: true }
+        name: { type: string }
+        accessPolicy: { type: object, additionalProperties: true, nullable: true }
+
+    DirectoryCreateDnD:
+      type: object
+      required: [name]
+      properties:
+        parentId: { type: integer, format: int64, nullable: true }
+        name: { type: string }
+        accessPolicy: { type: object, additionalProperties: true, nullable: true }
+
+    DirectoryUpdate:
+      type: object
+      properties:
+        parentId: { type: integer, format: int64, nullable: true }
+        name: { type: string }
+        accessPolicy: { type: object, additionalProperties: true, nullable: true }
+
+    DirectoryDetails:
+      type: object
+      properties:
+        directory: { $ref: '#/components/schemas/Directory' }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/Directory' }
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+
+    Document:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        directoryId: { type: integer, format: int64 }
+        title: { type: string }
+        fileKey: { type: string }
+        mime: { type: string, nullable: true }
+        size: { type: integer, nullable: true }
+        version: { type: integer }
+        createdAt: { type: integer, format: int64 }
+        createdBy: { type: integer, format: int64 }
+
+    DocumentCreate:
+      type: object
+      required: [directoryId, title, fileKey]
+      properties:
+        directoryId: { type: integer, format: int64 }
+        title: { type: string }
+        fileKey: { type: string }
+        mime: { type: string, nullable: true }
+        size: { type: integer, nullable: true }
+
+    DocumentUpdate:
+      type: object
+      properties:
+        directoryId: { type: integer, format: int64 }
+        title: { type: string }
+
+    DocumentVersion:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        documentId: { type: integer, format: int64 }
+        version: { type: integer }
+        fileKey: { type: string }
+        createdAt: { type: integer, format: int64 }
+        createdBy: { type: integer, format: int64 }
+
+    DocumentVersionCreate:
+      type: object
+      required: [fileKey]
+      properties:
+        fileKey: { type: string }
+
+    DownloadLink:
+      type: object
+      properties:
+        url: { type: string }
+        expiresAt: { type: integer, format: int64 }
+
+    SubjectType:
+      type: string
+      enum: [user, role]
+    ResourceType:
+      type: string
+      enum: [directory, document]
+    PermissionAction:
+      type: string
+      enum: [read, write, admin]
+    Permission:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        subjectType: { $ref: '#/components/schemas/SubjectType' }
+        subjectId: { type: integer, format: int64 }
+        resourceType: { $ref: '#/components/schemas/ResourceType' }
+        resourceId: { type: integer, format: int64 }
+        action: { $ref: '#/components/schemas/PermissionAction' }
+    PermissionCreate:
+      type: object
+      required: [subjectType, subjectId, resourceType, resourceId, action]
+      properties:
+        subjectType: { $ref: '#/components/schemas/SubjectType' }
+        subjectId: { type: integer, format: int64 }
+        resourceType: { $ref: '#/components/schemas/ResourceType' }
+        resourceId: { type: integer, format: int64 }
+        action: { $ref: '#/components/schemas/PermissionAction' }
+
+    PaginatedDocuments:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    # ----- Vehicles -----
+    Vehicle:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        plate: { type: string }
+        color: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    VehicleCreate:
+      type: object
+      required: [name, plate]
+      properties:
+        name: { type: string }
+        plate: { type: string }
+        color: { type: string, nullable: true }
+        isActive: { type: boolean, default: true }
+
+    VehicleUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        plate: { type: string }
+        color: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    VehicleLogAction:
+      type: string
+      enum: [take, release]
+
+    VehicleLog:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        vehicleId: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        action: { $ref: '#/components/schemas/VehicleLogAction' }
+        createdAt: { type: integer, format: int64 }
+        note: { type: string, nullable: true }
+
+    VehicleDetails:
+      type: object
+      properties:
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        currentHolder:
+          type: object
+          nullable: true
+          properties:
+            userId: { type: integer, format: int64 }
+            fullName: { type: string }
+            takenAt: { type: integer, format: int64 }
+
+    PaginatedVehicles:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Vehicle' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    PaginatedVehicleLogs:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleLog' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    # ----- Audit -----
+    AuditRecord:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        actorId: { type: integer, format: int64, nullable: true }
+        action: { type: string }
+        entity: { type: string }
+        entityId: { type: integer, format: int64 }
+        diff: { type: object, additionalProperties: true, nullable: true }
+        createdAt: { type: integer, format: int64 }
+
+    PaginatedAuditLog:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AuditRecord' }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
