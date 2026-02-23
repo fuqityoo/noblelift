@@ -111,7 +111,7 @@ export default React.memo(function AvailableTasksScreen() {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <View style={styles.header}>
-        <Text style={styles.h1}>Доступные</Text>
+        <Text style={styles.h1}>Общие</Text>
         <TextInput
           placeholder="Поиск задач…"
           placeholderTextColor={colors.mut}

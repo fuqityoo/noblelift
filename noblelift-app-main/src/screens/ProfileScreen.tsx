@@ -45,6 +45,25 @@ type User = {
 type MeResponse = { userId: number };
 type StatusRef = { code: string; label: string };
 
+const ROLE_CODE_TO_LABEL: Record<string, string> = {
+  super_admin: 'Супер-админ',
+  manager: 'Руководитель',
+  employee: 'Сотрудник',
+};
+
+function getRoleLabel(role?: Role | null): string {
+  if (!role) return '—';
+  const code = (role.code ?? '').toLowerCase();
+  return (ROLE_CODE_TO_LABEL[code] ?? role.name ?? code) || '—';
+}
+
+/** Убирает подсказку на английском из label, например "В офисе (in_office)" → "В офисе" */
+function statusLabelOnly(label?: string | null): string {
+  if (!label) return '—';
+  const m = label.match(/^(.+?)\s*\([a-z_]+\)\s*$/i);
+  return m ? m[1].trim() : label;
+}
+
 // ===== Мелкие утилиты =====
 function prettyTime(ms?: number | null): string {
   if (!ms) return '—';
@@ -110,7 +129,7 @@ export default React.memo(function ProfileScreen() {
 
   const currentStatusLabel = useMemo(() => {
     const f = statuses.find((s) => s.code === statusCode);
-    return f?.label ?? '—';
+    return statusLabelOnly(f?.label ?? null);
   }, [statuses, statusCode]);
 
 async function onSave() {
@@ -212,10 +231,7 @@ async function onSave() {
       <View style={styles.card}>
         <Text style={styles.title}>Профиль</Text>
         <View style={styles.metaRow}>
-          <Text style={styles.badge}>{user.role?.name ?? '—'}</Text>
-          <Text style={styles.meta}>ID: {user.id}</Text>
-          <Text style={styles.meta}>Активен: {user.isActive ? 'да' : 'нет'}</Text>
-          {!!user.createdAt && <Text style={styles.meta}>Создан: {prettyTime(user.createdAt)}</Text>}
+          <Text style={styles.badge}>{getRoleLabel(user.role)}</Text>
         </View>
 
         <View style={styles.avatarRow}>
@@ -309,7 +325,7 @@ async function onSave() {
         <Text style={styles.label}>Статус</Text>
         <TouchableOpacity onPress={() => setStatusModal(true)} style={styles.select}>
           <Text style={styles.selectText}>
-            {currentStatusLabel !== '—' ? `${currentStatusLabel} (${statusCode})` : 'Выберите статус'}
+            {currentStatusLabel !== '—' ? currentStatusLabel : 'Выберите статус'}
           </Text>
         </TouchableOpacity>
 
@@ -344,7 +360,7 @@ async function onSave() {
                 }}
               >
                 <Text style={[styles.statusBtnText, s.code === statusCode && styles.statusBtnTextActive]}>
-                  {s.label}
+                  {statusLabelOnly(s.label)}
                 </Text>
               </TouchableOpacity>
             ))}

@@ -236,21 +236,21 @@ export default function VehicleScreen() {
           <View style={styles.row}>
             <View style={[styles.field, { flex: 1 }]}>
               <Text style={styles.label}>Марка</Text>
-              <TextInput style={styles.input} value={brandNew} onChangeText={setBrandNew} placeholder="Toyota" />
+              <TextInput style={styles.input} value={brandNew} onChangeText={setBrandNew} placeholder="Toyota" placeholderTextColor="#6b7280" />
             </View>
             <View style={[styles.field, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.label}>Модель</Text>
-              <TextInput style={styles.input} value={modelNew} onChangeText={setModelNew} placeholder="Camry" />
+              <TextInput style={styles.input} value={modelNew} onChangeText={setModelNew} placeholder="Camry" placeholderTextColor="#6b7280" />
             </View>
           </View>
           <View style={styles.row}>
             <View style={[styles.field, { flex: 1 }]}>
               <Text style={styles.label}>Цвет</Text>
-              <TextInput style={styles.input} value={colorNew} onChangeText={setColorNew} placeholder="white" />
+              <TextInput style={styles.input} value={colorNew} onChangeText={setColorNew} placeholder="Белый" placeholderTextColor="#6b7280" />
             </View>
             <View style={[styles.field, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.label}>Госномер</Text>
-              <TextInput style={styles.input} value={numberNew} onChangeText={setNumberNew} placeholder="А123ВС77" autoCapitalize="characters" />
+              <TextInput style={styles.input} value={numberNew} onChangeText={setNumberNew} placeholder="А123ВС77" placeholderTextColor="#6b7280" autoCapitalize="characters" />
             </View>
           </View>
           <View style={styles.rowRight}>
