@@ -120,8 +120,6 @@ def delete_document(id: int, request: Request, db: Session = Depends(get_db), cu
 @router.get("/{id}/versions", response_model=dict)
 def list_versions(id: int, db: Session = Depends(get_db), current=Depends(get_current_user)):
     if not db.get(DocumentModel, id): raise HTTPException(status_code=404, detail="Not found")
-    if not has_access(db, current, "document", id, "read"):
-        raise HTTPException(status_code=403, detail="Forbidden")
     rows = db.execute(select(DocVerModel).where(DocVerModel.document_id == id).order_by(DocVerModel.version.desc())).scalars().all()
     return {"items": [DocVerSchema.model_validate(r) for r in rows]}
 
@@ -129,8 +127,6 @@ def list_versions(id: int, db: Session = Depends(get_db), current=Depends(get_cu
 async def upload_version(id: int, request: Request, f: UploadFile = File(...), db: Session = Depends(get_db), current=Depends(get_current_user)):
     d = db.get(DocumentModel, id)
     if not d: raise HTTPException(status_code=404, detail="Not found")
-    if not has_access(db, current, "document", id, "write"):
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     data = await f.read()
     path, size = save_document_version(id, f.filename, data)
@@ -164,8 +160,6 @@ def download_version(id: int, ver: int, db: Session = Depends(get_db), current=D
         select(DocVerModel).where(DocVerModel.document_id == id, DocVerModel.version == ver)
     ).scalar_one_or_none()
     if not dv: raise HTTPException(status_code=404, detail="Not found")
-    if not has_access(db, current, "document", id, "read"):
-        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         data = open(dv.storage_path, "rb").read()
     except FileNotFoundError:

@@ -173,9 +173,7 @@ export default function DirectoryScreen() {
         Alert.alert('Нет файла', 'У документа пока нет загруженных версий.');
         return;
       }
-      const token = getAccessToken();
-      const url = joinUrl(API_URL, `/documents/${doc.id}/versions/${latest.version}`);
-      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await api(`/documents/${doc.id}/versions/${latest.version}`);
       if (!res.ok) throw new Error('Скачивание не удалось');
       const blob = await res.blob();
       if (Platform.OS === 'web') {
@@ -293,33 +291,90 @@ export default function DirectoryScreen() {
               </View>
             )}
             {currentDirs.map((d) => (
-              <Pressable key={d.id} onPress={() => setSelectedId(d.id)}>
-                <Card>
-                  <Text style={styles.cardText}>📁 {d.name}</Text>
-                </Card>
-              </Pressable>
+              <View key={d.id} style={styles.docRow}>
+                <Pressable style={{ flex: 1 }} onPress={() => setSelectedId(d.id)}>
+                  <Card>
+                    <Text style={styles.cardText}>📁 {d.name}</Text>
+                  </Card>
+                </Pressable>
+                {isSuperAdmin && (
+                  <Pressable
+                    onPress={() => {
+                      const msg = `Удалить директорию «${d.name}»?`;
+                      const doDelete = async () => {
+                        try {
+                          const r = await api(`/directories/${d.id}`, { method: 'DELETE' });
+                          if (!r.ok) throw new Error('Не удалось удалить');
+                          loadDirs();
+                        } catch (e: any) {
+                          Alert.alert('Ошибка', e?.message ?? 'Не удалось удалить директорию');
+                        }
+                      };
+                      if (isWeb && typeof window !== 'undefined' && window.confirm(msg)) {
+                        doDelete();
+                      } else {
+                        Alert.alert('Удалить директорию', msg, [
+                          { text: 'Отмена', style: 'cancel' },
+                          { text: 'Удалить', style: 'destructive', onPress: doDelete },
+                        ]);
+                      }
+                    }}
+                    style={styles.deleteDocBtn}
+                  >
+                    <Text style={styles.deleteDocBtnText}>Удалить</Text>
+                  </Pressable>
+                )}
+              </View>
             ))}
           </>
         ) : (
           <>
             {subDirs.map((d) => (
-              <Pressable key={d.id} onPress={() => setSelectedId(d.id)}>
-                <Card>
-                  <Text style={styles.cardText}>📁 {d.name}</Text>
-                </Card>
-              </Pressable>
+              <View key={d.id} style={styles.docRow}>
+                <Pressable style={{ flex: 1 }} onPress={() => setSelectedId(d.id)}>
+                  <Card>
+                    <Text style={styles.cardText}>📁 {d.name}</Text>
+                  </Card>
+                </Pressable>
+                {isSuperAdmin && (
+                  <Pressable
+                    onPress={() => {
+                      const msg = `Удалить директорию «${d.name}»?`;
+                      const doDelete = async () => {
+                        try {
+                          const r = await api(`/directories/${d.id}`, { method: 'DELETE' });
+                          if (!r.ok) throw new Error('Не удалось удалить');
+                          loadDirs();
+                          if (selectedId != null) loadDocs(selectedId);
+                        } catch (e: any) {
+                          Alert.alert('Ошибка', e?.message ?? 'Не удалось удалить директорию');
+                        }
+                      };
+                      if (isWeb && typeof window !== 'undefined' && window.confirm(msg)) {
+                        doDelete();
+                      } else {
+                        Alert.alert('Удалить директорию', msg, [
+                          { text: 'Отмена', style: 'cancel' },
+                          { text: 'Удалить', style: 'destructive', onPress: doDelete },
+                        ]);
+                      }
+                    }}
+                    style={styles.deleteDocBtn}
+                  >
+                    <Text style={styles.deleteDocBtnText}>Удалить</Text>
+                  </Pressable>
+                )}
+              </View>
             ))}
             {loadingDocs ? (
               <ActivityIndicator style={{ marginVertical: 20 }} />
             ) : (
               <>
-                {isSuperAdmin && (
-                  <View style={styles.uploadRow}>
-                    <Button title={uploading ? 'Загрузка…' : 'Загрузить документ'} onPress={handleUploadDoc} disabled={uploading} />
-                    {/* @ts-ignore */}
-                    <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={onFileSelected} />
-                  </View>
-                )}
+                <View style={styles.uploadRow}>
+                  <Button title={uploading ? 'Загрузка…' : 'Загрузить документ'} onPress={handleUploadDoc} disabled={uploading} />
+                  {/* @ts-ignore */}
+                  <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={onFileSelected} />
+                </View>
                 {docs.map((doc) => (
                   <View key={doc.id} style={styles.docRow}>
                     <Pressable style={{ flex: 1 }} onPress={() => handleDocClick(doc)}>

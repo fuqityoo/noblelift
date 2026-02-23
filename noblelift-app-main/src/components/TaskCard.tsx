@@ -2,15 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
 import { colors, spacing } from '../ui/theme';
 import { formatTaskDate, getStatusCode, STATUS_CODE_TO_RU, PRIORITY_CODE_TO_RU } from '../lib/utils';
-import { api, API_URL, getAccessToken } from '../lib/api';
+import { api } from '../lib/api';
 import Badge from './Badge';
 import Button from './Button';
-
-function joinUrl(base: string, path: string) {
-  const b = base.replace(/\/+$/, '');
-  const p = path.replace(/^\/+/, '');
-  return `${b}/${p}`;
-}
 
 const DESC_LINE_HEIGHT = 20;
 const DESC_LINES = 3;
@@ -92,10 +86,8 @@ export default React.memo(function TaskCard({
   const topicName = task.topic?.name ?? (task as any).topicName ?? null;
   const fileCount = cachedFileCount ?? task.attachments?.length ?? 0;
   const handleDownloadFile = async (fileId: number) => {
-    const token = getAccessToken();
-    const url = joinUrl(API_URL, `/tasks/${taskId}/files/${fileId}`);
     try {
-      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await api(`/tasks/${taskId}/files/${fileId}`);
       if (!res.ok) return;
       const blob = await res.blob();
       const file = modalFiles.find((f) => f.id === fileId);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Platform, Alert, useWindowDimensions } from 'react-native';
 import { useApp } from '../state/AppContext';
 import { useMyUserId } from '../hooks/useMyUserId';
@@ -14,20 +14,24 @@ const BREAKPOINT = 600;
 export default React.memo(function AvailableTasksScreen() {
   const { width } = useWindowDimensions();
   const useTwoColumns = isWeb && width >= BREAKPOINT;
-  const { state, dispatch } = useApp();
+  const { state, dispatch, service } = useApp();
   const myUserId = useMyUserId();
   const isSuperAdmin = useIsSuperAdmin();
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<Set<string>>(new Set());
 
+  // Загружаем задачи (в т.ч. общие) при открытии экрана «Общие»
+  useEffect(() => {
+    service.refreshAvailableTasks();
+  }, [service]);
+
   const available = useMemo(() => {
     return state.tasks.filter(t => {
       const code = getStatusCode(t);
       const assignee = getAssigneeId(t);
       const unassigned = assignee == null || assignee === '' || assignee === 0;
-      const isCommon = t.type === 'common' || (t as any).isPrivate === false;
-      return code !== 'done' && unassigned && isCommon;
+      return code !== 'done' && unassigned;
     });
   }, [state.tasks]);
 

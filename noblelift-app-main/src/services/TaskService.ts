@@ -50,6 +50,10 @@ function toTask(t: any, forceCommon = false): Task {
   });
 }
 
+function extractItems(data: any): any[] {
+  return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+}
+
 export class TaskService {
   constructor(private getTasks: () => Task[], private setTasks: (tasks: Task[]) => void) {}
   private currentUserId?: string;
@@ -61,26 +65,39 @@ export class TaskService {
 
   sync = async (userId: string) => {
     const uid = Number(userId);
-    const mine = await api(`/tasks?assignee_id=${uid}&limit=200`);
-    const avail = await api(`/tasks/available?limit=200`);
+    const canLoadMine = Number.isFinite(uid) && uid > 0;
+    const mine = canLoadMine ? await api(`/tasks?assignee_id=${uid}&limit=200`) : null;
     const seen = new Set<string>();
     const list: Task[] = [];
-    if (mine.ok) {
-      const data = await mine.json();
-      const items: any[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+    if (mine?.ok) {
+      const data = await mine.json().catch(() => null);
+      const items = extractItems(data);
       items.forEach(t => {
         const id = String(t.id);
         if (!seen.has(id)) { seen.add(id); list.push(toTask(t)); }
       });
     }
-    if (avail.ok) {
-      const data = await avail.json();
-      const items: any[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-      items.forEach(t => {
-        const id = String(t.id);
-        if (!seen.has(id)) { seen.add(id); list.push(toTask(t, true)); }
-      });
+    if (list.length > 0 || mine?.ok) {
+      this.setTasks(list);
     }
+  };
+
+  syncAvailable = async () => {
+    const r = await api(`/tasks?limit=200`);
+    if (!r.ok) return;
+    const data = await r.json().catch(() => null);
+    const items = extractItems(data);
+    const seen = new Set<string>();
+    const current = this.getTasks();
+    const list: Task[] = [];
+    current.forEach(t => {
+      const id = String(t.id);
+      if (!seen.has(id)) { seen.add(id); list.push(t); }
+    });
+    items.forEach(t => {
+      const id = String(t.id);
+      if (!seen.has(id)) { seen.add(id); list.push(toTask(t)); }
+    });
     this.setTasks(list);
   };
 

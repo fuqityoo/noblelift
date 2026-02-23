@@ -69,6 +69,8 @@ type Service = {
   createCommon: (payload: Partial<Task>) => Promise<void>;
   takeCommon: (id: string) => Promise<void>;
   returnCommon: (id: string) => Promise<void>;
+  refreshTasks: () => Promise<void>;
+  refreshAvailableTasks: () => Promise<void>;
   addCar: (car: Omit<Car,'id'>) => Promise<void>;
   deleteCar: (id: string) => void;
   takeCar: (id: string, holder?: string) => void;
@@ -125,6 +127,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     createCommon: async (payload) => { await taskService.createCommon(payload); },
     takeCommon: async (id) => { await taskService.takeCommon(id); },
     returnCommon: async (id) => { await taskService.returnCommon(id); },
+    refreshTasks: async () => {
+      const uid = auth.profile?.userId;
+      if (uid != null) {
+        try { await taskService.sync(String(uid)); } catch (e) { console.warn('tasks sync failed', e); }
+      }
+    },
+    refreshAvailableTasks: async () => {
+      try { await taskService.syncAvailable(); } catch (e) { console.warn('available tasks sync failed', e); }
+    },
     addCar: async ({ brand, model, color, plate }) => {
       await createVehicle({ number: plate, brand, model, color: color || undefined });
       const items = await listVehicles();

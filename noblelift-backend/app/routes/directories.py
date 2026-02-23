@@ -38,7 +38,9 @@ def update_directory(id: int, body: DirectoryUpdate, db: Session = Depends(get_d
     return DirectorySchema.model_validate(d)
 
 @router.delete("/{id}", status_code=204)
-def delete_directory(id: int, db: Session = Depends(get_db), current=Depends(get_current_user)):
+def delete_directory(id: int, db: Session = Depends(get_db), current: UserModel = Depends(get_current_user)):
+    if not is_super_admin(current):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only super_admin can delete directories")
     d = db.get(DirectoryModel, id)
     if not d: raise HTTPException(status_code=404, detail="Not found")
     db.delete(d); db.commit()
