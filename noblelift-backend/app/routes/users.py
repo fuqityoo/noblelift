@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select, and_, func, distinct
+from sqlalchemy import select, and_, func, distinct, delete, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
@@ -14,6 +14,7 @@ from app.models.user import User as UserModel
 from app.models.role import Role as RoleModel
 from app.models.profile import Profile as ProfileModel
 from app.models.status import ProfileStatus as ProfileStatusModel
+from app.models.task import Task as TaskModel
 
 from app.schemas.user import User as UserSchema
 
@@ -237,7 +238,7 @@ def update_user(
     return UserSchema.model_validate(user)
 
 
-# ---------- Деактивировать пользователя ----------
+# ---------- Удалить пользователя (с его задачами) ----------
 @router.delete("/{id}", status_code=204)
 def delete_user(
     id: int,
@@ -250,7 +251,20 @@ def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.is_active = False
-    db.add(user)
+    # Нельзя удалить себя, чтобы случайно не потерять супер-админский доступ
+    if current.id == user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    # Удаляем все задачи, созданные этим пользователем или назначенные на него.
+    # Связанные файлы и события удалятся каскадно по ondelete=CASCADE.
+    db.execute(
+        delete(TaskModel).where(
+            or_(TaskModel.creator_id == id, TaskModel.assignee_id == id)
+        )
+    )
+    db.commit()
+
+    # Профиль и прочие связанные сущности с ondelete=CASCADE удалятся вместе с пользователем.
+    db.delete(user)
     db.commit()
     return

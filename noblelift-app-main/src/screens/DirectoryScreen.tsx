@@ -420,21 +420,51 @@ export default function DirectoryScreen() {
       <Text style={[styles.h1, styles.sectionTitle]}>Коллеги</Text>
       <View style={styles.colleagues}>
         {colleagues.map((u) => (
-          <Card key={u.id}>
-            <View style={styles.colleagueRow}>
-              <Avatar avatarUrl={u.avatarUrl} fullName={u.fullName} size={44} />
-              <View style={styles.colleagueInfo}>
-                <Text style={styles.colleagueName}>{u.fullName ?? '—'}</Text>
-                {u.title ? <Text style={styles.colleagueTitle}>{u.title}</Text> : null}
-                {u.profile?.status?.label ? <Text style={styles.colleagueStatus}>{u.profile.status.label}</Text> : null}
-                <View style={styles.contacts}>
-                  {[u.profile?.links?.phone, u.profile?.links?.email].filter(Boolean).map((c, i) => (
-                    <Text key={i} style={styles.contact} numberOfLines={1}>{c}</Text>
-                  ))}
+          <View key={u.id} style={styles.docRow}>
+            <Card>
+              <View style={styles.colleagueRow}>
+                <Avatar avatarUrl={u.avatarUrl} fullName={u.fullName} size={44} />
+                <View style={styles.colleagueInfo}>
+                  <Text style={styles.colleagueName}>{u.fullName ?? '—'}</Text>
+                  {u.title ? <Text style={styles.colleagueTitle}>{u.title}</Text> : null}
+                  {u.profile?.status?.label ? <Text style={styles.colleagueStatus}>{u.profile.status.label}</Text> : null}
+                  <View style={styles.contacts}>
+                    {[u.profile?.links?.phone, u.profile?.links?.email].filter(Boolean).map((c, i) => (
+                      <Text key={i} style={styles.contact} numberOfLines={1}>{c}</Text>
+                    ))}
+                  </View>
                 </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+            {isSuperAdmin && (
+              <Pressable
+                onPress={() => {
+                  const msg = `Удалить пользователя «${u.fullName || 'без имени'}»?\\n\\n` +
+                    'Все задачи, привязанные к этому пользователю, также будут удалены без возможности восстановления.';
+                  const doDelete = async () => {
+                    try {
+                      const r = await api(`/users/${u.id}`, { method: 'DELETE' });
+                      if (!r.ok) throw new Error('Не удалось удалить пользователя');
+                      setColleagues(prev => prev.filter((x) => x.id !== u.id));
+                    } catch (e: any) {
+                      Alert.alert('Ошибка', e?.message ?? 'Не удалось удалить пользователя');
+                    }
+                  };
+                  if (isWeb && typeof window !== 'undefined' && window.confirm(msg)) {
+                    doDelete();
+                  } else {
+                    Alert.alert('Удалить пользователя', msg, [
+                      { text: 'Отмена', style: 'cancel' },
+                      { text: 'Удалить', style: 'destructive', onPress: doDelete },
+                    ]);
+                  }
+                }}
+                style={styles.deleteDocBtn}
+              >
+                <Text style={styles.deleteDocBtnText}>Удалить</Text>
+              </Pressable>
+            )}
+          </View>
         ))}
       </View>
     </ScrollView>
